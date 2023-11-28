@@ -161,7 +161,7 @@ def key_pressed(key: str) -> bool:
 def key_released(key: str) -> bool:
     return key in _prev_keys and key not in _curr_keys
 
-def main_loop(tick=None, fps=16) -> None:
+def main_loop(tick=None, fps=15) -> None:
     global _mouse_pos, _tick
     _tick = tick
     clock = pg.time.Clock()

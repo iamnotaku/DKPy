@@ -1,53 +1,50 @@
 import g2d
 import actor
 import random
-import os.path
 
 # Definizione delle costanti
 
 SCREEN_WIDTH = 224
 SCREEN_HEIGHT = 256
 GRAVITY = 1
-JUMP_VELOCITY = -6
+JUMP_VELOCITY = -15
 PLATFORM_HEIGHT = 8
 MARIO_WIDTH = 11
 MARIO_HEIGHT = 15
-BASE_DIR = os.path.expanduser("~") + "\Desktop"
-BACKGROUND_IMAGE = BASE_DIR + "\Donkey-Kong\donkey-kong-bg.png"
-CHARACTER_IMAGE = BASE_DIR + "\Donkey-Kong\donkey-kong.png"
-ELEMENTS_FILE = BASE_DIR + "\Donkey-Kong\dk_elements.txt"
+BACKGROUND_IMAGE = r"C:\Users\franc\Desktop\Donkey-Kong\donkey-kong-bg.png"
+CHARACTER_IMAGE = r"C:\Users\franc\Desktop\Donkey-Kong\donkey-kong.png"
+ELEMENTS_FILE = r"C:/Users/franc/Desktop/Donkey-Kong/dk_elements.txt"
 
-g2d.init_canvas((SCREEN_WIDTH, SCREEN_HEIGHT),3)
+g2d.init_canvas((SCREEN_WIDTH, SCREEN_HEIGHT), 3)
 
-class Actor:
+class Platform(actor.Actor):
     def __init__(self, x, y, width, height):
         self._x = x
         self._y = y
-        self.width = width
-        self.height = height
-
-class Platform(Actor):
-    def __init__(self, x, y, width, height):
-        super().__init__(x, y, width, height)
+        self._width = width
+        self._height = height
 
     def pos(self):
         return (self._x, self._y)
     
     def size(self):
-        return (self.width, self.height) 
+        return (self._width, self._height) 
 
-class Ladder(Actor):
+class Ladder(actor.Actor):
     def __init__(self, x, y, width, height):
-        super().__init__(x, y, width, height)
+        self._x = x
+        self._y = y
+        self._width = width
+        self._height = height
 
     def pos(self):
         return (self._x, self._y)
     
     def size(self):
-        return (self.width, self.height)
+        return (self._width, self._height)
 
 
-class Mario(Actor):
+class Mario(actor.Actor):
     def __init__(self, x, y):
         self._x = x
         self._y = y
@@ -67,13 +64,8 @@ class Mario(Actor):
             self.velocity_y = JUMP_VELOCITY
             self.is_jumping = True  # Set jumping flag
 
-    def go_down(self):
-        pass
-
-
 
     #the problem here is that collisions are detected at the end of key pressing and this is problematic to check
-
 
 
     def update(self, dir):
@@ -103,14 +95,24 @@ class Mario(Actor):
                 if self.velocity_y >= 0:
                     self.is_jumping = False
         elif dir=="platform_collision":
-            self.velocity_x = 0
-            self.velocity_y = 0
-            self._y = self._y - 1
+            if self.is_jumping:
+                self.velocity_x = 0
+                self.velocity_y = 0
+                self._y = self._y + 2
+            else:
+                self.velocity_x = 0
+                self.velocity_y = 0
+                self._y = self._y - 2
         elif dir=="ladder_collision":
             g2d.draw_image_clip(CHARACTER_IMAGE, (self._x, self._y), (126, 23), (12, 16))
             self.velocity_x = 0
             self.velocity_y = 0
             self._y = self._y - 3
+        elif dir=="ladder_collision_down":
+            g2d.draw_image_clip(CHARACTER_IMAGE, (self._x, self._y), (126, 23), (12, 16))
+            self.velocity_x = 0
+            self.velocity_y = 0
+            self._y = self._y + 3
 
     def drawLeft(self):
         g2d.draw_image_clip(CHARACTER_IMAGE, (self._x, self._y), (136, 3), (12, 16)),
@@ -123,34 +125,45 @@ class Mario(Actor):
         g2d.draw_image_clip(CHARACTER_IMAGE, (self._x, self._y), (176, 3), (12, 16))
         g2d.draw_image_clip(CHARACTER_IMAGE, (self._x, self._y), (197, 3), (12, 16))
 
-class Barrels(Actor):
-    def __init__(self, x, y):
-        self._x = 32
-        self._y = 73
-        self._w = 15
-        self.velocity_x = random.choice([-5, 5])
+class Barrels(actor.Actor):
+    def __init__(self, x, y, width, height):
+        self._x = x
+        self._y = y
+        self._w = width
+        self.velocity_x = 3
         self.on_platform = False
+        self._dy = 0
+        self._height = height
+
+    def fall(self):
+        self._dy += GRAVITY
+        self._y += self._dy
 
     def update(self):
-
-        if self.on_platform:
-            self._y -= PLATFORM_HEIGHT
-            self.on_platform = False
-        else:
+        
+        if not self.on_platform:
+            self._y -= 1
             self._x += self.velocity_x
             if self._x < 0 or self._x + self._w > SCREEN_WIDTH:
                 self.velocity_x = -self.velocity_x
+                self._y+=16
+
 
     def draw(self):
         g2d.draw_image_clip(CHARACTER_IMAGE, (self._x, self._y), (66, 258), (12, 10))
         
+    def pos(self):
+        return self._x, self._y
+    
+    def size(self):
+        return self._w, self._height
         
 
 class DonkeyKongArena(actor.Arena):
     def __init__(self):
         self._background = g2d.load_image(BACKGROUND_IMAGE)
         self.mario = Mario(44, 232)
-        self.barrels = [Barrels(random.randint(0, SCREEN_WIDTH - 14), 0) for _ in range(5)]
+        self.barrels = [Barrels(random.randint(0, SCREEN_WIDTH - 14), 73, 10, 5) for _ in range(5)]
         self.platforms = []
         self.ladders = []
         self.load_elements_from_file()
@@ -204,16 +217,29 @@ class DonkeyKongArena(actor.Arena):
         for ladder in self.ladders:
             if self.check_collision(self.mario, ladder) and "ArrowUp" in g2d.current_keys():
                 self.mario.update("ladder_collision")
+            elif self.check_collision(self.mario, ladder) and "ArrowDown" in g2d.current_keys():
+                self.mario.update("ladder_collision_down")
         
 
         # updating barrels positions and """""sprites"""""
         for barrel in self.barrels:
+            barrel.fall()
+
+            for platform in self.platforms:
+                if self.check_collision(barrel, platform):
+                    platform.on_platform = True
+                    barrel._dy = 0  # Stop falling when colliding with a platform
             barrel.update()
+            if self.check_collision(self.mario, barrel):
+                g2d.alert("GAME OVER")
+                exit()
             barrel.draw()
 
+        
     def game_loop(self):
         g2d.game_loop(self.tick)
 
+
 arena = DonkeyKongArena()
-g2d.play_audio("donkeykong.ogg", loop=True) #playing donkey kong theme
+#g2d.play_audio("donkeykong.ogg", loop=True) #playing donkey kong theme
 g2d.main_loop(arena.tick)
